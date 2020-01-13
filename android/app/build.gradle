@@ -1,6 +1,7 @@
 apply plugin: "com.android.application"
 
 import com.android.build.OutputFile
+import groovy.json.JsonSlurper
 
 /**
  * The react.gradle file registers a task for each build variant (e.g. bundleDebugJsAndAssets
@@ -91,7 +92,6 @@ project.ext.react = [
 ]
 
 apply from: "../../node_modules/react-native/react.gradle"
-apply from: "../../node_modules/react-native-code-push/android/codepush.gradle"
 
 /**
  * Set this to true to create two separate APKs instead of one:
@@ -110,6 +110,14 @@ def enableProguardInReleaseBuilds = false
 
 def pass = getPassword("shuirong1997","gakki_keystore")
 
+//获取配置文件的版本信息
+def getAppVersion() {
+    def inputFile = new File("../package.json")
+    def packageJson = new JsonSlurper().parseText(inputFile.text)
+    return packageJson["version"]
+}
+def appVersion = getAppVersion()
+
 Properties properties = new Properties()
 properties.load(project.rootProject.file('local.properties').newDataInputStream())
 android {
@@ -120,8 +128,12 @@ android {
         applicationId "com.gakki"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
+        versionCode 5
+        versionName appVersion  // appVersion 这样有点问题，code-push打包报错；还是先写死
+        compileOptions {
+            sourceCompatibility JavaVersion.VERSION_1_8
+            targetCompatibility JavaVersion.VERSION_1_8
+        }
         ndk {
             abiFilters "armeabi-v7a", "x86"
         }
@@ -150,7 +162,6 @@ android {
             zipAlignEnabled false
             shrinkResources false    // 移除无用的resource文件
             signingConfig signingConfigs.release
-            buildConfigField "String", "CODEPUSH_KEY", '"'+properties.getProperty("code_push_key_staging")+'"'
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
 
@@ -158,7 +169,6 @@ android {
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             signingConfig signingConfigs.release
-              buildConfigField "String", "CODEPUSH_KEY", '"'+properties.getProperty("code_push_key_production")+'"'
 
         }
     }
@@ -184,8 +194,12 @@ configurations.all {
 }
 
 dependencies {
+    implementation project(':react-native-restart')
+    implementation project(':react-native-splash-screen')
+    implementation project(':@react-native-community_async-storage')
+    compile project(':react-native-image-crop-picker')
+    compile project(':react-native-video')
     compile project(':react-native-svg')
-    compile project(':react-native-code-push')
     compile project(':react-native-spinkit')
     compile project(':react-native-image-picker')
     // compile project(':react-native-popover-menu')

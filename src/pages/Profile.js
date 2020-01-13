@@ -23,11 +23,11 @@ import ScrollableTabView from 'react-native-scrollable-tab-view'
 import DefaultTabBar from './common/DefaultTabBar'
 import TootScreen from './screen/TootScreen'
 import MediaScreen from './screen/MediaScreen'
-import Fab from './common/Fab'
 import { themeData } from '../utils/color'
 import mobx from '../utils/mobx'
 import HTMLView from './common/HTMLView'
 import { observer } from 'mobx-react'
+import { CancelToken } from 'axios'
 
 /**
  * Toot详情页面
@@ -46,6 +46,8 @@ export default class Profile extends Component {
       loading: true,
       tabBarHeight: 500
     }
+
+    this.cancel = []
   }
 
   componentWillMount() {
@@ -83,6 +85,10 @@ export default class Profile extends Component {
     this.fetchData()
   }
 
+  componentWillUnmount() {
+    this.cancel.forEach(cancel => cancel && cancel())
+  }
+
   fetchData = data => {
     const id = data || this.props.navigation.getParam('id')
     this.getAccountData(id)
@@ -98,7 +104,9 @@ export default class Profile extends Component {
    * @param {id}: id
    */
   getAccountData = id => {
-    getAccountData(id)
+    getAccountData(mobx.domain, id, {
+      cancelToken: new CancelToken(c => this.cancel.push(c))
+    })
       .then(res => {
         this.setState({
           profile: res,
@@ -117,7 +125,9 @@ export default class Profile extends Component {
    * @param {id}: id
    */
   getRelationship = id => {
-    getRelationship([id]).then(res => {
+    getRelationship(mobx.domain, [id], {
+      cancelToken: new CancelToken(c => this.cancel.push(c))
+    }).then(res => {
       this.setState({
         relationship: res[0]
       })
@@ -128,7 +138,9 @@ export default class Profile extends Component {
    * @description 给toot点赞，如果已经点过赞就取消点赞
    */
   favourite = () => {
-    favourite(this.state.toot.id, this.state.toot.favourited).then(() => {
+    favourite(mobx.domain, this.state.toot.id, this.state.toot.favourited, {
+      cancelToken: new CancelToken(c => this.cancel.push(c))
+    }).then(() => {
       this.update('favourited', 'favourites_count')
     })
   }
@@ -137,7 +149,9 @@ export default class Profile extends Component {
    * @description 转发toot
    */
   reblog = () => {
-    reblog(this.state.toot.id, this.state.toot.reblogged).then(() => {
+    reblog(mobx.domain, this.state.toot.id, this.state.toot.reblogged, {
+      cancelToken: new CancelToken(c => this.cancel.push(c))
+    }).then(() => {
       this.update('reblogged', 'reblogs_count')
     })
   }
@@ -165,7 +179,9 @@ export default class Profile extends Component {
    * @description 隐藏某人，不看所有动态
    */
   mute = () => {
-    mute(this.state.toot.id, this.state.toot.muted).then(() => {
+    mute(this.state.toot.id, this.state.toot.muted, {
+      cancelToken: new CancelToken(c => this.cancel.push(c))
+    }).then(() => {
       this.goBackWithParam()
     })
   }
@@ -192,7 +208,9 @@ export default class Profile extends Component {
    * @param {following}: 正在关注该用户
    */
   followTheAccount = following => {
-    follow(this.state.profile.id, !following).then(res => {
+    follow(mobx.domain, this.state.profile.id, !following, {
+      cancelToken: new CancelToken(c => this.cancel.push(c))
+    }).then(res => {
       this.setState({
         relationship: res
       })
@@ -281,7 +299,10 @@ export default class Profile extends Component {
     }
 
     return (
-      <View style={styles.header}>
+      <TouchableOpacity
+        onPress={() => mobx.profileTabRef.scrollToOffset({ offset: 0 })}
+        style={styles.header}
+      >
         <Animated.View
           scrollEventThrottle={20}
           style={{
@@ -301,7 +322,7 @@ export default class Profile extends Component {
               }}
             >
               <HTMLView
-                data={profile.display_name}
+                content={profile.display_name || ''}
                 pTagStyle={{
                   color: color.contrastColor,
                   fontWeight: 'bold',
@@ -338,7 +359,7 @@ export default class Profile extends Component {
             name={'arrow-left'}
           />
         </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
     )
   }
 
@@ -373,8 +394,9 @@ export default class Profile extends Component {
               getRelationship={this.getRelationshipElement}
               backgroundColor={color.themeColor}
               activeTextColor={color.contrastColor}
+              activeTabStyle={{ fontSize: 20 }}
               inactiveTextColor={color.subColor}
-              underlineStyle={{ backgroundColor: color.contrastColor }}
+              underlineStyle={{ backgroundColor: 'transparent' }}
               style={{
                 position: 'absolute',
                 top: this.distanceFromTop,
@@ -382,7 +404,7 @@ export default class Profile extends Component {
                 height: state.tabBarHeight,
                 zIndex: 100
               }}
-              tabBarStyle={{ borderColor: color.subColor }}
+              tabBarStyle={{ borderColor: 'transparent' }}
               onLayout={e => {
                 this.setState({
                   tabBarHeight: e.nativeEvent.layout.height
@@ -406,7 +428,6 @@ export default class Profile extends Component {
             navigation={this.props.navigation}
           />
         </ScrollableTabView>
-        <Fab navigation={this.props.navigation} />
       </ScrollView>
     )
   }

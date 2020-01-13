@@ -3,15 +3,16 @@
  */
 
 import React, { Component } from 'react'
-import { View, FlatList, RefreshControl } from 'react-native'
+import { FlatList } from 'react-native'
 import { getUserStatuses } from '../../utils/api'
 import ListFooterComponent from '../common/ListFooterComponent'
-import TootBox from '../common/TootBox'
+import TootBox from '../common/TootBox/Index'
 import { themeData } from '../../utils/color'
 import mobx from '../../utils/mobx'
 import Divider from '../common/Divider'
 import { TootListSpruce } from '../common/Spruce'
 import { observer } from 'mobx-react'
+import { CancelToken } from 'axios'
 
 let color = {}
 @observer
@@ -24,6 +25,8 @@ export default class TootScreen extends Component {
       loading: true,
       url: 'home'
     }
+
+    this.cancel = []
   }
   componentDidMount() {
     this.getUserPinnedStatuses()
@@ -80,6 +83,10 @@ export default class TootScreen extends Component {
     }
   }
 
+  componentWillUnmount() {
+    this.cancel.forEach(cancel => cancel && cancel())
+  }
+
   /**
    * @description 获取用户发送的toot
    * @param {cb}: 成功后的回调函数
@@ -87,11 +94,18 @@ export default class TootScreen extends Component {
    */
   getUserStatuses = (cb, params) => {
     const id = this.props.navigation.getParam('id')
-    getUserStatuses(id, {
-      exclude_replies: false,
-      pinned: false,
-      ...params
-    })
+    getUserStatuses(
+      mobx.domain,
+      id,
+      {
+        exclude_replies: false,
+        pinned: false,
+        ...params
+      },
+      {
+        cancelToken: new CancelToken(c => this.cancel.push(c))
+      }
+    )
       .then(res => {
         // 手动移除已经被置顶的嘟文
         // P.S. mastodon2.7.0的接口返回的status不存在pinned属性，疑似bug
@@ -134,11 +148,17 @@ export default class TootScreen extends Component {
     this.setState({
       loading: true
     })
-    getUserStatuses(this.props.navigation.getParam('id'), {
-      pinned: true
-    })
+    getUserStatuses(
+      mobx.domain,
+      this.props.navigation.getParam('id'),
+      {
+        pinned: true
+      },
+      {
+        cancelToken: new CancelToken(c => this.cancel.push(c))
+      }
+    )
       .then(res => {
-        // const newList = res.concat(this.state.list)
         this.setState(
           {
             pinnedList: res,
@@ -225,6 +245,7 @@ export default class TootScreen extends Component {
     }
     return (
       <FlatList
+        ref={ref => mobx.updateProfileTabRef(ref, 0)}
         contentContainerStyle={{ paddingTop: 500, ...this.props.style }}
         ItemSeparatorComponent={() => <Divider />}
         showsVerticalScrollIndicator={false}

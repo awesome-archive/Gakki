@@ -3,8 +3,12 @@ package com.gakki;
 import android.app.Application;
 
 import com.facebook.react.ReactApplication;
+import com.avishayil.rnrestart.ReactNativeRestartPackage;
+import org.devio.rn.splashscreen.SplashScreenReactPackage;
+import com.reactnativecommunity.asyncstorage.AsyncStoragePackage;
+import com.reactnative.ivpusic.imagepicker.PickerPackage;
+import com.brentvatne.react.ReactVideoPackage;
 import com.horcrux.svg.SvgPackage;
-import com.microsoft.codepush.react.CodePush;
 import com.imagepicker.ImagePickerPackage;
 // import ui.popovermenu.RNPopoverMenuPackage;
 import com.oblador.vectoricons.VectorIconsPackage;
@@ -22,11 +26,6 @@ public class MainApplication extends Application implements ReactApplication {
 
   private final ReactNativeHost mReactNativeHost = new ReactNativeHost(this) {
 
-        @Override
-        protected String getJSBundleFile() {
-        return CodePush.getJSBundleFile();
-        }
-    
     @Override
     public boolean getUseDeveloperSupport() {
       return BuildConfig.DEBUG;
@@ -36,12 +35,16 @@ public class MainApplication extends Application implements ReactApplication {
     protected List<ReactPackage> getPackages() {
       return Arrays.<ReactPackage>asList(
           new MainReactPackage(),
+            new ReactNativeRestartPackage(),
+            new SplashScreenReactPackage(),
+            new AsyncStoragePackage(),
+            new PickerPackage(),
+            new ReactVideoPackage(),
             new SvgPackage(),
           new ImagePickerPackage(),
           new VectorIconsPackage(),
           new RNGestureHandlerPackage(),
-          new RNSpinkitPackage(),
-          new CodePush(BuildConfig.CODEPUSH_KEY, MainApplication.this, BuildConfig.DEBUG)
+          new RNSpinkitPackage()
       );
     }
 

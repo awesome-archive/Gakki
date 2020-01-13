@@ -6,19 +6,36 @@ import React, { Component } from 'react'
 import { View, StyleSheet, FlatList, RefreshControl } from 'react-native'
 import { TootListSpruce } from '../common/Spruce'
 import { getHomeTimelines } from '../../utils/api'
-import TootBox from '../common/TootBox'
-import ListFooterComponent from '../common/ListFooterComponent'
+import TootBox from '../common/TootBox/Index'
 import Divider from '../common/Divider'
+import Empty from '../common/Empty'
+import PropTypes from 'prop-types'
+import mobx from '../../utils/mobx'
+import { CancelToken } from 'axios'
 
 export default class LocalScreen extends Component {
+  static propTypes = {
+    params: PropTypes.object,
+    navigation: PropTypes.object.isRequired,
+    onScroll: PropTypes.func.isRequired,
+    spruce: PropTypes.element,
+    url: PropTypes.string,
+    index: PropTypes.number.isRequired
+  }
+
+  static defaultProps = {
+    params: {},
+    url: 'public',
+    spruce: <TootListSpruce />
+  }
+
   constructor(props) {
     super(props)
     this.state = {
       list: [],
-      loading: true,
-      url: 'public',
-      baseParams: { local: true, only_media: false }
+      loading: true
     }
+    this.cancel = null
   }
   componentDidMount() {
     this.fetchTimelines()
@@ -75,6 +92,10 @@ export default class LocalScreen extends Component {
     }
   }
 
+  componentWillUnmount() {
+    this.cancel && this.cancel()
+  }
+
   deleteToot = id => {
     this.setState({
       list: this.state.list.filter(toot => toot.id !== id)
@@ -101,10 +122,17 @@ export default class LocalScreen extends Component {
    * @param {params}: 分页参数
    */
   fetchTimelines = (cb, params) => {
-    getHomeTimelines(this.state.url, {
-      ...this.state.baseParams,
-      ...params
-    })
+    getHomeTimelines(
+      mobx.domain,
+      this.props.url,
+      {
+        ...params,
+        ...this.props.params
+      },
+      {
+        cancelToken: new CancelToken(c => (this.cancel = c))
+      }
+    )
       .then(res => {
         // 同时将数据更新到state数据中，刷新视图
         this.setState({
@@ -141,33 +169,32 @@ export default class LocalScreen extends Component {
       return <TootListSpruce />
     }
     return (
-      <View style={styles.container}>
-        <FlatList
-          ItemSeparatorComponent={() => <Divider />}
-          showsVerticalScrollIndicator={false}
-          data={state.list}
-          onEndReachedThreshold={0.3}
-          onEndReached={this.onEndReached}
-          onScroll={this.props.onScroll}
-          keyExtractor={item => item.id}
-          refreshControl={
-            <RefreshControl
-              refreshing={state.loading}
-              onRefresh={this.refreshHandler}
-            />
-          }
-          ListFooterComponent={() => <ListFooterComponent />}
-          renderItem={({ item }) => (
-            <TootBox
-              data={item}
-              navigation={this.props.navigation}
-              deleteToot={this.deleteToot}
-              muteAccount={this.muteAccount}
-              blockAccount={this.blockAccount}
-            />
-          )}
-        />
-      </View>
+      <FlatList
+        ref={ref => mobx.updateHomeTabRef(ref, this.props.index)}
+        ItemSeparatorComponent={() => <Divider />}
+        showsVerticalScrollIndicator={false}
+        data={state.list}
+        onEndReachedThreshold={0.3}
+        onEndReached={this.onEndReached}
+        onScroll={this.props.onScroll}
+        keyExtractor={item => item.id}
+        refreshControl={
+          <RefreshControl
+            refreshing={state.loading}
+            onRefresh={this.refreshHandler}
+          />
+        }
+        ListEmptyComponent={<Empty />}
+        renderItem={({ item }) => (
+          <TootBox
+            data={item}
+            navigation={this.props.navigation}
+            deleteToot={this.deleteToot}
+            muteAccount={this.muteAccount}
+            blockAccount={this.blockAccount}
+          />
+        )}
+      />
     )
   }
 }

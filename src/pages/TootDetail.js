@@ -4,12 +4,13 @@ import { Button } from 'native-base'
 import Header from './common/Header'
 import Loading from './common/Loading'
 import Icon from 'react-native-vector-icons/FontAwesome5'
-import { getStatuses, context } from '../utils/api'
+import { context } from '../utils/api'
 import { themeData } from '../utils/color'
 import mobx from '../utils/mobx'
 import Context from './common/Context'
 import ReplyInput from './common/ReplyInput'
 import { observer } from 'mobx-react'
+import { CancelToken } from 'axios'
 
 /**
  * Toot详情页面
@@ -21,10 +22,11 @@ export default class TootDetail extends Component {
     super(props)
     this.state = {
       toot: null,
-      context: null,
       ancestors: [],
       descendants: []
     }
+
+    this.cancel = []
   }
 
   componentDidMount() {
@@ -42,7 +44,6 @@ export default class TootDetail extends Component {
 
     this.setState({
       toot: toot,
-      context: null,
       ancestors: [],
       descendants: []
     })
@@ -53,26 +54,21 @@ export default class TootDetail extends Component {
     this.init(navigation.getParam('data'))
   }
 
-  fetchData = () => {
-    this.setState({
-      toot: null
-    })
-
-    const toot = this.props.navigation.getParam('data')
-    const id = toot.id
-
-    getStatuses(id).then(res => {
-      this.setState({
-        toot: res
-      })
-    })
-
-    this.getContext(id)
+  componentWillUnmount() {
+    this.cancel.forEach(cancel => cancel && cancel())
   }
 
   getContext = id => {
-    context(id).then(res => {
-      this.setState(res)
+    context(mobx.domain, id, {
+      cancelToken: new CancelToken(c => this.cancel.push(c))
+    }).then(res => {
+      if (!res.ancestors.length && !res.descendants.length) {
+        return
+      }
+      this.setState({
+        ancestors: res.ancestors,
+        descendants: res.descendants
+      })
     })
   }
 

@@ -2,12 +2,10 @@ import React, { Component } from 'react'
 import { StyleSheet, View, StatusBar } from 'react-native'
 import PropTypes from 'prop-types'
 import { Header, Left, Body, Right, Button, Title } from 'native-base'
-import SideBar from '../SideBar'
 import Icon from 'react-native-vector-icons/FontAwesome5'
 import { themeData } from '../../utils/color'
 import mobx from '../../utils/mobx'
 import { observer } from 'mobx-react'
-import { Drawer } from 'teaset'
 
 /**
  * @description 公用Header，默认是首页Header，其他页面使用时可自行传入组件
@@ -21,27 +19,13 @@ export default class HeaderItem extends Component {
     title: PropTypes.oneOfType([PropTypes.string, PropTypes.element])
       .isRequired,
     left: PropTypes.element,
-    right: PropTypes.oneOfType([PropTypes.string, PropTypes.element]),
-    shadow: PropTypes.bool // 是否展示组件下方阴影
+    right: PropTypes.oneOfType([PropTypes.string, PropTypes.element])
   }
 
   static defaultProps = {
-    style: {},
-    shadow: true
+    style: {}
   }
 
-  closeDrawer = () => {
-    this.drawer.close()
-  }
-  openDrawer = () => {
-    this.drawer = Drawer.open(
-      <SideBar
-        navigation={this.props.navigation}
-        closeDrawer={this.closeDrawer}
-      />,
-      'left'
-    )
-  }
   /**
    * @description 右侧三种可能的情况：
    * 1. 空白 2. 展示传入组件 3. 展示默认组件
@@ -81,11 +65,11 @@ export default class HeaderItem extends Component {
 
     return (
       <Header
+        noShadow={true}
         style={[
           props.style,
           {
-            backgroundColor: color.themeColor,
-            marginBottom: this.props.shadow ? 2 : 0
+            backgroundColor: color.themeColor
           }
         ]}
       >
@@ -95,7 +79,7 @@ export default class HeaderItem extends Component {
             <Button
               transparent
               onPress={() => {
-                this.openDrawer()
+                props.navigation.toggleDrawer()
               }}
             >
               <Icon

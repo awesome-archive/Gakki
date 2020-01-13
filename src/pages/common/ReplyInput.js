@@ -8,8 +8,6 @@ import {
   TouchableOpacity,
   Dimensions,
   Image,
-  Animated,
-  Easing,
   FlatList
 } from 'react-native'
 import Icon from 'react-native-vector-icons/FontAwesome5'
@@ -23,7 +21,9 @@ import mobx from '../../utils/mobx'
 import { themeData } from '../../utils/color'
 import { Menu, Overlay, Input } from 'teaset'
 import ImagePicker from 'react-native-image-picker'
+import VideoPicker from 'react-native-image-crop-picker'
 import { save, fetch } from '../../utils/store'
+import { CancelToken } from 'axios'
 
 let color = {}
 const width = Dimensions.get('window').width
@@ -275,19 +275,13 @@ export default class ReplyInput extends Component {
       whichIsFocused: '', // 当前哪个输入框被触发了
       visibility: mobx.visibility, // 当前选择的嘟文公开选项的图标名称
       mediaList: [],
-      rotateValue: new Animated.Value(0),
       stopRotate: true,
       customEmojis: [],
       emojiBoxIsShown: false, // 显示emojiBox吗？
       showNSFW: false // 显示NSFW按钮？（仅在存在媒体内容时显示）
     }
-  }
 
-  componentWillMount() {
-    this.spin = this.state.rotateValue.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['0deg', '360deg']
-    })
+    this.cancel = []
   }
 
   componentDidMount() {
@@ -304,15 +298,21 @@ export default class ReplyInput extends Component {
     })
   }
 
+  componentWillUnmount() {
+    this.cancel.forEach(cancel => cancel && cancel())
+  }
+
   /**
    * @description 从网络重新获取emojis数据
    */
   getCustomEmojis = () => {
-    getCustomEmojis().then(res => {
+    getCustomEmojis(mobx.domain, {
+      cancelToken: new CancelToken(c => this.cancel.push(c))
+    }).then(res => {
       this.setState({
         customEmojis: res
       })
-      save('emojis', res)
+      save('emojis', res).then(() => {})
       // 另外，转换emojis Array数据为Object数据，留作后面HTML渲染时用
       this.translateEmoji()
     })
@@ -324,7 +324,7 @@ export default class ReplyInput extends Component {
       emojiObj[item.shortcode] = item.static_url
     })
 
-    save('emojiObj', emojiObj)
+    save('emojiObj', emojiObj).then(() => {})
     mobx.updateEmojiObj('emojiObj', emojiObj)
   }
 
@@ -342,56 +342,88 @@ export default class ReplyInput extends Component {
     }
 
     ImagePicker.showImagePicker(options, response => {
-      // 开始旋转～
-      this.setState({
-        stopRotate: false
-      })
-      this.startRotate()
-
       if (response.didCancel) {
-        this.setState({
-          stopRotate: true
-        })
+        console.log('didCancel: ', response.didCancel)
       } else if (response.error) {
-        this.setState({
-          stopRotate: true
-        })
+        console.log('error: ', response.error)
       } else {
-        upload({
-          response: response,
-          description: 'description',
-          focus: 'focus'
-        })
+        upload(
+          mobx.domain,
+          {
+            response: response,
+            description: 'description',
+            focus: 'focus'
+          },
+          {
+            cancelToken: new CancelToken(c => this.cancel.push(c))
+          }
+        )
           .then(res => {
             this.setState({
               mediaList: [...this.state.mediaList].concat({
                 uri: res.preview_url,
                 id: res.id
               }),
-              stopRotate: true,
               showNSFW: true
             })
           })
-          .catch(() => {
-            this.setState({
-              stopRotate: true
-            })
+          .catch(err => {
+            console.log('error: ', err)
           })
       }
     })
   }
 
+  pickVideo = () => {
+    VideoPicker.openPicker({
+      mediaType: 'video'
+    })
+      .then(video => {
+        upload(
+          mobx.domain,
+          {
+            response: {
+              uri: video.path,
+              type: video.mime,
+              fileName: 'filename'
+            },
+            description: 'description',
+            focus: 'focus'
+          },
+          {
+            cancelToken: new CancelToken(c => this.cancel.push(c))
+          }
+        )
+          .then(res => {
+            this.setState({
+              mediaList: [...this.state.mediaList].concat({
+                uri: res.preview_url,
+                id: res.id
+              }),
+              showNSFW: true
+            })
+          })
+          .catch(() => {})
+      })
+      .catch(err => {
+        console.log('VideoPicker error', err)
+      })
+  }
+
   sendToot = () => {
     const props = this.props
-
-    sendStatuses({
-      in_reply_to_id: mobx.in_reply_to_id,
-      status: mobx.inputValue,
-      spoiler_text: mobx.cw ? mobx.spoiler_text : '',
-      visibility: this.state.visibility,
-      sensitive: mobx.NSFW,
-      media_ids: this.state.mediaList.map(media => media.id)
-    }).then(res => {
+    sendStatuses(
+      mobx.domain,
+      {
+        in_reply_to_id: mobx.in_reply_to_id,
+        status: mobx.inputValue,
+        spoiler_text: mobx.cw ? mobx.spoiler_text : '',
+        visibility: this.state.visibility,
+        sensitive: mobx.NSFW,
+        media_ids: this.state.mediaList.map(media => media.id)
+      },
+      { cancelToken: new CancelToken(c => this.cancel.push(c)) }
+    ).then(res => {
       if (props.appendReply) {
         props.appendReply(res)
       }
@@ -510,9 +542,14 @@ export default class ReplyInput extends Component {
     newList.forEach((media, index) => {
       if (index === mediaIndex) {
         media['description'] = description
-        updateMedia(media.id, {
-          description
-        }).then(() => {
+        updateMedia(
+          mobx.domain,
+          media.id,
+          {
+            description
+          },
+          { cancelToken: new CancelToken(c => this.cancel.push(c)) }
+        ).then(() => {
           // 更新媒体文件辅助标题参数
         })
       }
@@ -549,47 +586,6 @@ export default class ReplyInput extends Component {
       return null
     }
     return <EmojiBox data={this.state.customEmojis} />
-  }
-
-  /**
-   * @description 旋转相机图标，表示正在上传文件
-   */
-  startRotate = () => {
-    this.state.rotateValue.setValue(0)
-    const rotate = Animated.timing(this.state.rotateValue, {
-      toValue: 1,
-      duration: 2000,
-      easing: Easing.linear
-    })
-    if (!this.state.stopRotate) {
-      rotate.start(() => this.startRotate())
-    }
-  }
-
-  // 根据文件是否在上传返回不同的图标
-  getMediaIcon = () => {
-    return (
-      <TouchableOpacity onPress={this.pickImage}>
-        {this.state.stopRotate ? (
-          <Icon name={'camera'} style={styles.icon} />
-        ) : (
-          <Animated.View
-            style={{
-              transform: [
-                {
-                  rotate: this.spin
-                }
-              ]
-            }}
-          >
-            <Icon
-              name={'sync-alt'}
-              style={[styles.syncIcon, { color: color.contrastColor }]}
-            />
-          </Animated.View>
-        )}
-      </TouchableOpacity>
-    )
   }
 
   render() {
@@ -685,12 +681,12 @@ export default class ReplyInput extends Component {
 
     return (
       <View style={boxStyle}>
-        {!this.props.sendMode && (
+        {!this.props.sendMode ? (
           <Text style={{ marginBottom: 5, color: color.subColor }}>
             回复
             {mobx.reply_to_username ? '@' + mobx.reply_to_username : ''}
           </Text>
-        )}
+        ) : null}
         {cwElement}
         <View>
           <TextInput
@@ -717,14 +713,19 @@ export default class ReplyInput extends Component {
           />
         </View>
         <View style={styles.inputTools}>
-          {this.getMediaIcon()}
+          <TouchableOpacity onPress={this.pickImage}>
+            <Icon name={'image'} style={styles.icon} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={this.pickVideo}>
+            <Icon name={'video'} style={styles.icon} />
+          </TouchableOpacity>
           <TouchableOpacity onPress={this.showVisibilityOptions}>
             <Icon
               name={visibilityDict[state.visibility].iconName}
               style={styles.icon}
             />
           </TouchableOpacity>
-          {state.showNSFW && (
+          {state.showNSFW ? (
             <TouchableOpacity onPress={() => mobx.exchangeNSFW()}>
               {mobx.NSFW ? (
                 <Text style={[styles.enableCW, { color: color.contrastColor }]}>
@@ -734,7 +735,7 @@ export default class ReplyInput extends Component {
                 <Text style={styles.disenableCW}>NSFW</Text>
               )}
             </TouchableOpacity>
-          )}
+          ) : null}
           <TouchableOpacity
             ref={ref => (this.refOption = ref)}
             onPress={() => mobx.exchangeCW()}

@@ -8,9 +8,9 @@ import Header from './common/Header'
 import { Button } from 'native-base'
 import Icon from 'react-native-vector-icons/FontAwesome5'
 import { themeData } from '../utils/color'
-import { version } from '../utils/config'
 import mobx from '../utils/mobx'
 import { observer } from 'mobx-react'
+import { version, deploymentKey } from '../utils/config'
 
 let color = {}
 @observer
@@ -157,13 +157,32 @@ export default class About extends Component {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => this.props.navigation.navigate('OpenSource')}
+            onPress={() => this.openURL('https://github.com/shuiRong/Gakki/releases')}
             activeOpacity={0.5}
             style={{
               marginTop: 20,
               borderColor: color.contrastColor,
               borderRadius: 3,
               borderWidth: 1,
+              padding: 5,
+              paddingLeft: 10,
+              paddingRight: 10
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 17,
+                color: color.contrastColor
+              }}
+            >
+              检查更新
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => this.props.navigation.navigate('OpenSource')}
+            activeOpacity={0.5}
+            style={{
+              marginTop: 20,
               padding: 5,
               paddingLeft: 10,
               paddingRight: 10

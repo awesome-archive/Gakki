@@ -1,18 +1,16 @@
 import React, { Component } from 'react'
-import { View, Animated, Dimensions } from 'react-native'
+import { View, Animated, Dimensions, BackHandler } from 'react-native'
 import HeaderItem from './common/Header'
-import HomeScreen from './screen/HomeScreen'
-import LocalScreen from './screen/LocalScreen'
-import PublicScreen from './screen/PublicScreen'
+import Tab from './screen/index'
 import Fab from './common/Fab'
-import ScrollableTabView, {
-  DefaultTabBar
-} from 'react-native-scrollable-tab-view'
+import ScrollableTabView from 'react-native-scrollable-tab-view'
+import DefaultTabBar from './common/DefaultTabBar.home'
 import { getCustomEmojis, getCurrentUser } from '../utils/api'
 import { themeData } from '../utils/color'
 import { save, fetch } from '../utils/store'
 import mobx from '../utils/mobx'
 import { observer } from 'mobx-react'
+import { CancelToken } from 'axios'
 
 /**
  * 主页
@@ -28,12 +26,21 @@ export default class Home extends Component {
       headerTop: new Animated.Value(0),
       emojiObj: {}
     }
+
+    this.cancel = []
   }
   componentWillMount() {
     this.top = this.state.headerTop.interpolate({
-      inputRange: [0, 270, 271, 280],
-      outputRange: [0, -50, -50, -50]
+      inputRange: [0, 270],
+      outputRange: [0, -50],
+      extrapolate: 'clamp'
     })
+    this.distanceFromBottom = this.state.headerTop.interpolate({
+      inputRange: [0, 70],
+      outputRange: [28, -50],
+      extrapolate: 'clamp'
+    })
+
     this.animatedEvent = Animated.event([
       {
         nativeEvent: {
@@ -44,6 +51,13 @@ export default class Home extends Component {
   }
 
   componentDidMount() {
+    this.backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (this.props.navigation.isFocused()) {
+        BackHandler.exitApp()
+        return true
+      }
+      return false
+    })
     fetch('emojis').then(res => {
       // 检测是否保存有emoji数据，如果没有的话，从网络获取
       if (!res || !res.length) {
@@ -56,14 +70,17 @@ export default class Home extends Component {
     })
 
     if (!mobx.account || !mobx.account.id) {
-      getCurrentUser().then(res => {
+      getCurrentUser(mobx.domain, null, {
+        cancelToken: new CancelToken(c => this.cancel.push(c))
+      }).then(res => {
         mobx.updateAccount(res)
       })
     }
   }
 
   componentWillUnmount() {
-    this._navListener.remove()
+    this.backHandler.remove()
+    this.cancel.forEach(cancel => cancel && cancel())
   }
 
   /**
@@ -88,8 +105,10 @@ export default class Home extends Component {
    * @description 从网络重新获取emojis数据
    */
   getCustomEmojis = () => {
-    getCustomEmojis().then(res => {
-      save('emojis', res)
+    getCustomEmojis(mobx.domain, {
+      cancelToken: new CancelToken(c => this.cancel.push(c))
+    }).then(res => {
+      save('emojis', res).then(() => {})
 
       this.translateEmoji(res)
     })
@@ -106,7 +125,7 @@ export default class Home extends Component {
         emojiObj[':' + item.shortcode + ':'] = item.static_url
       })
 
-      save('emojiObj', emojiObj)
+      save('emojiObj', emojiObj).then(() => {})
       mobx.updateEmojiObj(emojiObj)
     }
 
@@ -121,62 +140,73 @@ export default class Home extends Component {
   }
 
   render() {
-    const state = this.state
     color = themeData[mobx.theme]
 
     return (
       <View style={{ flex: 1, backgroundColor: color.themeColor }}>
-        <View style={{ flex: 1 }}>
-          <Animated.View style={{ top: this.top }}>
-            <HeaderItem
-              shadow={false}
-              title={'Gakki'}
+        <Animated.View style={{ top: this.top }}>
+          <HeaderItem title={'Gakki'} navigation={this.props.navigation} />
+        </Animated.View>
+        <Animated.View
+          style={{
+            height: deviceHeight,
+            top: this.top
+          }}
+        >
+          <ScrollableTabView
+            initialPage={1}
+            renderTabBar={() => (
+              <DefaultTabBar
+                tabRef={this.tabref}
+                backgroundColor={color.themeColor}
+                activeTextColor={color.contrastColor}
+                activeTabStyle={{ fontSize: 20 }}
+                inactiveTextColor={color.subColor}
+                navigation={this.props.navigation}
+                underlineStyle={{
+                  backgroundColor: 'transparent'
+                }}
+                style={{ borderColor: 'transparent' }}
+                goToPage={number => {
+                  alert(number)
+                }}
+              />
+            )}
+          >
+            <Tab
+              tabLabel={'本站'}
+              params={{ local: true, only_media: false }}
+              onScroll={this.animatedEvent}
+              index={0}
               navigation={this.props.navigation}
             />
-          </Animated.View>
-          <Animated.View
-            style={{
-              height: deviceHeight,
-              top: this.top
-            }}
-          >
-            <ScrollableTabView
-              initialPage={1}
-              renderTabBar={() => (
-                <DefaultTabBar
-                  backgroundColor={color.themeColor}
-                  activeTextColor={color.contrastColor}
-                  inactiveTextColor={color.subColor}
-                  navigation={this.props.navigation}
-                  underlineStyle={{
-                    backgroundColor: color.contrastColor
-                  }}
-                  style={{ borderColor: color.subColor }}
-                />
-              )}
-            >
-              <LocalScreen
-                tabLabel={'本站'}
-                emojiObj={state.emojiObj}
-                onScroll={this.animatedEvent}
-                navigation={this.props.navigation}
-              />
-              <HomeScreen
-                tabLabel={'主页'}
-                emojiObj={state.emojiObj}
-                onScroll={this.animatedEvent}
-                navigation={this.props.navigation}
-              />
-              <PublicScreen
-                tabLabel={'跨站'}
-                emojiObj={state.emojiObj}
-                onScroll={this.animatedEvent}
-                navigation={this.props.navigation}
-              />
-            </ScrollableTabView>
-          </Animated.View>
+            <Tab
+              tabLabel={'主页'}
+              url={'home'}
+              onScroll={this.animatedEvent}
+              index={1}
+              navigation={this.props.navigation}
+            />
+            <Tab
+              tabLabel={'跨站'}
+              params={{ only_media: false }}
+              index={2}
+              onScroll={this.animatedEvent}
+              navigation={this.props.navigation}
+            />
+          </ScrollableTabView>
+        </Animated.View>
+        <Animated.View
+          style={{
+            width: 50,
+            height: 50,
+            position: 'absolute',
+            right: 28,
+            bottom: mobx.hideSendTootButton ? this.distanceFromBottom : 28
+          }}
+        >
           <Fab navigation={this.props.navigation} />
-        </View>
+        </Animated.View>
       </View>
     )
   }

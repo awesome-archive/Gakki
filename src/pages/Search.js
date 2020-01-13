@@ -17,18 +17,19 @@ import {
 import { Button } from 'native-base'
 import { search } from '../utils/api'
 import Icon from 'react-native-vector-icons/FontAwesome5'
-import TootBox from './common/TootBox'
+import TootBox from './common/TootBox/Index'
 import UserItem from './common/UserItem'
 import Header from './common/Header'
 import { themeData } from '../utils/color'
 import mobx from '../utils/mobx'
 import Divider from './common/Divider'
 import { observer } from 'mobx-react'
+import { CancelToken } from 'axios'
 
 let color = {}
 const deviceWidth = Dimensions.get('window').width
 @observer
-export default class Notifications extends Component {
+export default class Search extends Component {
   constructor(props) {
     super(props)
     this.state = {
@@ -38,10 +39,16 @@ export default class Notifications extends Component {
       hashtags: [],
       statuses: []
     }
+
+    this.cancel = null
   }
 
   componentDidMount() {
     this.search()
+  }
+
+  componentWillUnmount() {
+    this.cancel && this.cancel()
   }
 
   refreshHandler = () => {
@@ -53,7 +60,9 @@ export default class Notifications extends Component {
   }
 
   search = () => {
-    search(this.state.text)
+    search(mobx.domain, this.state.text, {
+      cancelToken: new CancelToken(c => (this.cancel = c))
+    })
       .then(res => {
         this.setState(res)
       })
@@ -123,7 +132,7 @@ export default class Notifications extends Component {
             </Button>
           }
         />
-        {state.accounts.length !== 0 && (
+        {state.accounts.length !== 0 ? (
           <View>
             <View
               style={{
@@ -156,12 +165,14 @@ export default class Notifications extends Component {
                 />
               }
               renderItem={({ item }) => (
-                <UserItem data={item} navigation={this.props.navigation} />
+                <UserItem account={item} navigation={this.props.navigation} />
               )}
             />
           </View>
+        ) : (
+          <View />
         )}
-        {state.hashtags.length !== 0 && (
+        {state.hashtags.length !== 0 ? (
           <View>
             <Divider />
             <View
@@ -203,13 +214,17 @@ export default class Notifications extends Component {
                     })
                   }
                 >
-                  <Text>#{item.name}</Text>
+                  <Text style={{ color: color.contrastColor }}>
+                    #{item.name}
+                  </Text>
                 </TouchableOpacity>
               )}
             />
           </View>
+        ) : (
+          <View />
         )}
-        {state.statuses.length !== 0 && (
+        {state.statuses.length !== 0 ? (
           <View>
             <Divider />
             <View
@@ -253,6 +268,8 @@ export default class Notifications extends Component {
               )}
             />
           </View>
+        ) : (
+          <View />
         )}
       </ScrollView>
     )

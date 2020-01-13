@@ -3,7 +3,7 @@
  */
 
 import React, { Component } from 'react'
-import { View, StyleSheet, FlatList, RefreshControl } from 'react-native'
+import { View, StyleSheet, FlatList, RefreshControl, Text } from 'react-native'
 import { Button } from 'native-base'
 import { followRequests } from '../utils/api'
 import Icon from 'react-native-vector-icons/FontAwesome5'
@@ -11,9 +11,11 @@ import Header from './common/Header'
 import { themeData } from '../utils/color'
 import mobx from '../utils/mobx'
 import Divider from './common/Divider'
+import Empty from './common/Empty'
 import UserItem from './common/UserItem'
 import { observer } from 'mobx-react'
 import { UserSpruce } from './common/Spruce'
+import { CancelToken } from 'axios'
 
 let color = {}
 @observer
@@ -24,16 +26,24 @@ export default class FollowRequests extends Component {
       list: [],
       loading: true
     }
+
+    this.cancel = null
   }
   componentDidMount() {
     this.followRequests()
+  }
+
+  componentWillUnmount() {
+    this.cancel && this.cancel()
   }
 
   /**
    * @description 获取关注请求列表
    */
   followRequests = () => {
-    followRequests()
+    followRequests(mobx.domain, {
+      cancelToken: new CancelToken(c => (this.cancel = c))
+    })
       .then(res => {
         this.setState({
           list: this.state.list.concat(res),
@@ -84,7 +94,8 @@ export default class FollowRequests extends Component {
         ) : (
           <FlatList
             ItemSeparatorComponent={() => <Divider />}
-            ListFooterComponent={<Divider />}
+            ListFooterComponent={state.list.length ? <Divider /> : <View />}
+            ListEmptyComponent={<Empty />}
             showsVerticalScrollIndicator={false}
             data={state.list}
             keyExtractor={item => item.id}
@@ -96,7 +107,7 @@ export default class FollowRequests extends Component {
             }
             renderItem={({ item }) => (
               <UserItem
-                data={item}
+                account={item}
                 model={'request'}
                 navigation={this.props.navigation}
                 deleteUser={this.deleteUser}

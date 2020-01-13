@@ -35,6 +35,7 @@ const DefaultTabBar = createReactClass({
     tabs: PropTypes.array,
     backgroundColor: PropTypes.string,
     activeTextColor: PropTypes.string,
+    activeTabStyle: PropTypes.object,
     inactiveTextColor: PropTypes.string,
     textStyle: Text.propTypes.style,
     tabStyle: ViewPropTypes.style,
@@ -53,8 +54,14 @@ const DefaultTabBar = createReactClass({
   renderTabOption(name, page) {},
 
   renderTab(name, page, isTabActive, onPressHandler) {
-    const { activeTextColor, inactiveTextColor, textStyle } = this.props
+    const {
+      activeTextColor,
+      inactiveTextColor,
+      textStyle,
+      activeTabStyle
+    } = this.props
     const textColor = isTabActive ? activeTextColor : inactiveTextColor
+    const theActiveTabStyle = isTabActive ? activeTabStyle : {}
     const fontWeight = isTabActive ? 'bold' : 'normal'
 
     return (
@@ -67,7 +74,13 @@ const DefaultTabBar = createReactClass({
         onPress={() => onPressHandler(page)}
       >
         <View style={[styles.tab, this.props.tabStyle]}>
-          <Text style={[{ color: textColor, fontWeight }, textStyle]}>
+          <Text
+            style={[
+              { color: textColor, fontWeight },
+              textStyle,
+              theActiveTabStyle
+            ]}
+          >
             {name}
           </Text>
         </View>
@@ -137,7 +150,7 @@ const DefaultTabBar = createReactClass({
                 {this.props.getRelationship(profile)}
                 <View>
                   <HTMLView
-                    data={profile.display_name}
+                    content={profile.display_name}
                     pTagStyle={{
                       color: color.contrastColor,
                       fontWeight: 'bold'
@@ -151,7 +164,7 @@ const DefaultTabBar = createReactClass({
                 </View>
                 <HTMLView
                   navigation={this.props.navigation}
-                  data={profile.note}
+                  content={profile.note}
                   pTagStyle={{
                     color: color.contrastColor,
                     fontSize: 14,

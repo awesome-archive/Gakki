@@ -2,13 +2,13 @@ import axios from 'axios'
 import { Toast } from 'teaset'
 
 const service = axios.create({
-  baseURL: 'https://cmx.im',
   timeout: 10000 // 请求超时时间限制
 })
 
 // 请求拦截器
 service.interceptors.request.use(
   config => {
+    console.log(config.url)
     return config
   },
   err => {
@@ -27,7 +27,7 @@ service.interceptors.response.use(
       Toast.message(err.error)
     }
 
-    return Promise.reject(error)
+    return Promise.reject(err)
   }
 )
 

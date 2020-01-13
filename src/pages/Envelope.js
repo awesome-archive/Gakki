@@ -7,15 +7,15 @@ import { View, StyleSheet, FlatList, RefreshControl } from 'react-native'
 import { Button } from 'native-base'
 import { getConversations } from '../utils/api'
 import Icon from 'react-native-vector-icons/FontAwesome5'
-import TootBox from './common/TootBox'
+import TootBox from './common/TootBox/Index'
 import Header from './common/Header'
-// import Loading from './common/Loading'
 import ListFooterComponent from './common/ListFooterComponent'
 import { themeData } from '../utils/color'
 import mobx from '../utils/mobx'
 import Divider from './common/Divider'
 import { observer } from 'mobx-react'
 import { TootListSpruce } from './common/Spruce'
+import { CancelToken } from 'axios'
 
 @observer
 export default class Envelope extends Component {
@@ -25,9 +25,15 @@ export default class Envelope extends Component {
       list: [],
       loading: true
     }
+
+    this.cancel = null
   }
   componentDidMount() {
     this.getConversations()
+  }
+
+  componentWillUnmount() {
+    this.cancel && this.cancel()
   }
 
   deleteToot = id => {
@@ -56,7 +62,9 @@ export default class Envelope extends Component {
    * @param {params}: 分页参数
    */
   getConversations = (cb, params) => {
-    getConversations(params)
+    getConversations(mobx.domain, params, {
+      cancelToken: new CancelToken(c => (this.cancel = c))
+    })
       .then(res => {
         // 同时将数据更新到state数据中，刷新视图
         this.setState({
